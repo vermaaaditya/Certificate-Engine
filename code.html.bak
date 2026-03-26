@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Architectural Registry | Certification Engine</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- React 18 -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<!-- Babel for JSX -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- JSZip -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-high": "#f0f2f5",
+                        "tertiary-container": "#e0e7ff",
+                        "secondary-fixed-dim": "#94a3b8",
+                        "primary-container": "#4f46e5",
+                        "on-error": "#ffffff",
+                        "secondary-fixed": "#cbd5e1",
+                        "on-background": "#0f172a",
+                        "secondary-container": "#f1f5f9",
+                        "on-tertiary-container": "#312e81",
+                        "surface-container-low": "#ffffff",
+                        "on-tertiary-fixed": "#1e1b4b",
+                        "outline": "#64748b",
+                        "surface-container": "#f8fafc",
+                        "on-tertiary-fixed-variant": "#4338ca",
+                        "primary": "#4f46e5",
+                        "error-container": "#fee2e2",
+                        "surface-container-lowest": "#ffffff",
+                        "background": "#f8fafc",
+                        "tertiary-fixed-dim": "#818cf8",
+                        "inverse-primary": "#c7d2fe",
+                        "tertiary-fixed": "#6366f1",
+                        "on-surface": "#0f172a",
+                        "inverse-surface": "#1e293b",
+                        "secondary": "#64748b",
+                        "on-primary-container": "#ffffff",
+                        "error": "#ef4444",
+                        "primary-fixed": "#4f46e5",
+                        "on-secondary-fixed": "#0f172a",
+                        "tertiary": "#6366f1",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#4f46e5",
+                        "on-primary-fixed": "#ffffff",
+                        "outline-variant": "#e2e8f0",
+                        "surface-dim": "#e2e8f0",
+                        "surface": "#f8fafc",
+                        "primary-fixed-dim": "#4338ca",
+                        "on-secondary": "#ffffff",
+                        "on-surface-variant": "#475569",
+                        "on-error-container": "#450a0a",
+                        "surface-variant": "#f1f5f9",
+                        "surface-bright": "#ffffff",
+                        "on-secondary-fixed-variant": "#334155",
+                        "on-secondary-container": "#1e293b",
+                        "inverse-on-surface": "#f8fafc",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-highest": "#e2e8f0",
+                        "on-primary-fixed-variant": "#3730a3"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: { "DEFAULT": "0.375rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 22px;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body antialiased selection:bg-primary selection:text-white">
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// Font options with their CSS values
+const FONT_OPTIONS = [
+  { label: 'Editorial Serif Bold', value: 'Georgia, serif' },
+  { label: 'Modernist Sans', value: '"Inter", sans-serif' },
+  { label: 'Classic Script', value: '"Times New Roman", serif' },
+  { label: 'Geometric Technical', value: '"Manrope", sans-serif' },
+];
+
+// Color palette options — map to actual hex values
+const COLOR_PALETTE = [
+  { bg: 'bg-on-background', hex: '#0f172a' },
+  { bg: 'bg-primary', hex: '#4f46e5' },
+  { bg: 'bg-tertiary', hex: '#6366f1' },
+  { bg: 'bg-secondary', hex: '#64748b' },
+  { bg: 'bg-outline', hex: '#64748b' },
+  { bg: 'bg-primary-fixed-dim', hex: '#4338ca' },
+  { bg: 'bg-tertiary-fixed', hex: '#6366f1' },
+  { bg: 'bg-white border border-outline-variant', hex: '#ffffff' },
+];
+
+// ──────────── Upload Zone Component ────────────
+function UploadZone({ label, templateType, onUpload, uploadedName }) {
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef(null);
+
+  const handleFile = (file) => {
+    if (!file) return;
+    if (!file.type.match(/^image\/(png|jpeg)$/)) {
+      alert('Only PNG and JPG files are accepted.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      onUpload(templateType, e.target.result, file.name);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    handleFile(file);
+  };
+
+  const onDragOver = (e) => { e.preventDefault(); setDragOver(true); };
+  const onDragLeave = () => setDragOver(false);
+
+  return (
+    <div
+      className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+        dragOver ? 'border-primary bg-primary/5' : uploadedName ? 'border-emerald-400 bg-emerald-50' : 'border-outline-variant hover:border-primary/50'
+      }`}
+      onDrop={onDrop}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onClick={() => inputRef.current?.click()}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png, image/jpeg"
+        className="hidden"
+        onChange={(e) => handleFile(e.target.files[0])}
+      />
+      {uploadedName ? (
+        <div className="flex flex-col items-center gap-2">
+          <span className="material-symbols-outlined text-emerald-500 !text-[32px]">check_circle</span>
+          <p className="text-sm font-bold text-emerald-700">{uploadedName}</p>
+          <p className="text-[10px] text-on-surface-variant">Click or drag to replace</p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3">
+          <span className="material-symbols-outlined text-on-surface-variant/50 !text-[40px]">cloud_upload</span>
+          <p className="text-sm font-bold text-on-surface">{label}</p>
+          <p className="text-[10px] text-on-surface-variant">Drag & drop or click to browse — PNG/JPG only</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ──────────── Main App Component ────────────
+function App() {
+  // ── State ──
+  const [templates, setTemplates] = useState({ appreciation: null, participation: null });
+  const [templateNames, setTemplateNames] = useState({ appreciation: '', participation: '' });
+  const [type, setType] = useState('appreciation');
+  const [name, setName] = useState('');
+  const [batch, setBatch] = useState('');
+  const [nameSize, setNameSize] = useState(52);
+  const [nameFont, setNameFont] = useState('Georgia, serif');
+  const [nameColor, setNameColor] = useState('#1a1a2e');
+  const [nameY, setNameY] = useState(49.5);
+  const [batchY, setBatchY] = useState(56.5);
+  const [directorName, setDirectorName] = useState('');
+  const [mentorName, setMentorName] = useState('');
+  const [sigY, setSigY] = useState(88);
+  const [sigSize, setSigSize] = useState(24);
+  const [batchLines, setBatchLines] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [statusMsg, setStatusMsg] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(true);
+
+  const canvasRef = useRef(null);
+
+  const bothUploaded = templates.appreciation && templates.participation;
+
+  // ── Template Upload Handler ──
+  const handleTemplateUpload = (templateType, base64, fileName) => {
+    setTemplates(prev => ({ ...prev, [templateType]: base64 }));
+    setTemplateNames(prev => ({ ...prev, [templateType]: fileName }));
+  };
+
+  // ── Canvas Render ──
+  const renderCertificate = useCallback((canvasEl, config) => {
+    const { templates: tpls, type: t, name: n, batch: b, nameSize: ns, nameFont: nf, nameColor: nc, nameY: ny, batchY: by, directorName: dn, mentorName: mn, sigY: sy, sigSize: ss } = config;
+    const src = tpls[t];
+    if (!src || !canvasEl) return;
+
+    const img = new Image();
+    img.onload = () => {
+      canvasEl.width = img.naturalWidth;
+      canvasEl.height = img.naturalHeight;
+      const ctx = canvasEl.getContext('2d');
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+
+      // 1. Draw template
+      ctx.drawImage(img, 0, 0);
+
+      // 2. Draw recipient name
+      ctx.save();
+      ctx.font = `600 ${ns}px ${nf}`;
+      ctx.fillStyle = nc;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(
+        n || 'Recipient Name',
+        canvasEl.width * 0.50,
+        canvasEl.height * (ny / 100)
+      );
+      ctx.restore();
+
+      // 3. Draw batch/branch
+      ctx.save();
+      const batchFontSize = Math.round(ns * 0.52);
+      ctx.font = `400 ${batchFontSize}px ${nf}`;
+      ctx.fillStyle = t === 'participation' ? '#1e3a6e' : '#666666';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(
+        b ? `(${b})` : '',
+        canvasEl.width * 0.50,
+        canvasEl.height * (by / 100)
+      );
+      ctx.restore();
+
+      // 4. Draw Director Principal signature name
+      if (dn) {
+        ctx.save();
+        ctx.font = `600 ${ss}px ${nf}`;
+        ctx.fillStyle = nc;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(dn, canvasEl.width * 0.25, canvasEl.height * (sy / 100));
+        ctx.restore();
+      }
+
+      // 5. Draw Faculty Mentor signature name
+      if (mn) {
+        ctx.save();
+        ctx.font = `600 ${ss}px ${nf}`;
+        ctx.fillStyle = nc;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(mn, canvasEl.width * 0.75, canvasEl.height * (sy / 100));
+        ctx.restore();
+      }
+    };
+    img.src = src;
+  }, []);
+
+  // Re-render on config changes
+  useEffect(() => {
+    if (!bothUploaded) return;
+    renderCertificate(canvasRef.current, { templates, type, name, batch, nameSize, nameFont, nameColor, nameY, batchY, directorName, mentorName, sigY, sigSize });
+  }, [templates, type, name, batch, nameSize, nameFont, nameColor, nameY, batchY, directorName, mentorName, sigY, sigSize, bothUploaded, renderCertificate]);
+
+  // ── Single Export ──
+  const exportPNG = () => {
+    const offscreen = document.createElement('canvas');
+    renderCertificate(offscreen, { templates, type, name, batch, nameSize, nameFont, nameColor, nameY, batchY, directorName, mentorName, sigY, sigSize });
+    setTimeout(() => {
+      const link = document.createElement('a');
+      const safeName = (name || 'certificate').replace(/\s+/g, '_');
+      link.download = `${safeName}_${type}.png`;
+      link.href = offscreen.toDataURL('image/png');
+      link.click();
+    }, 300);
+  };
+
+  // ── Batch Export ──
+  const batchExport = async () => {
+    const lines = batchLines.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+
+    setIsExporting(true);
+    setProgress(0);
+    setStatusMsg('');
+    const zip = new JSZip();
+
+    for (let i = 0; i < lines.length; i++) {
+      const [recipientName, recipientBatch] = lines[i].split(',').map(s => s.trim());
+
+      await new Promise(resolve => {
+        const offscreen = document.createElement('canvas');
+        const img = new Image();
+        img.onload = () => {
+          offscreen.width = img.naturalWidth;
+          offscreen.height = img.naturalHeight;
+          const ctx = offscreen.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+
+          ctx.font = `600 ${nameSize}px ${nameFont}`;
+          ctx.fillStyle = nameColor;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(
+            recipientName,
+            offscreen.width * 0.50,
+            offscreen.height * (nameY / 100)
+          );
+
+          const batchFontSize = Math.round(nameSize * 0.52);
+          ctx.font = `400 ${batchFontSize}px ${nameFont}`;
+          ctx.fillStyle = type === 'participation' ? '#1e3a6e' : '#666666';
+          ctx.fillText(
+            recipientBatch ? `(${recipientBatch})` : '',
+            offscreen.width * 0.50,
+            offscreen.height * (batchY / 100)
+          );
+
+          // Director Principal signature
+          if (directorName) {
+            ctx.font = `600 ${sigSize}px ${nameFont}`;
+            ctx.fillStyle = nameColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(directorName, offscreen.width * 0.25, offscreen.height * (sigY / 100));
+          }
+
+          // Faculty Mentor signature
+          if (mentorName) {
+            ctx.font = `600 ${sigSize}px ${nameFont}`;
+            ctx.fillStyle = nameColor;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(mentorName, offscreen.width * 0.75, offscreen.height * (sigY / 100));
+          }
+
+          const base64 = offscreen.toDataURL('image/png').split(',')[1];
+          const fname = `${(recipientName || 'cert').replace(/\s+/g, '_')}_${type}.png`;
+          zip.file(fname, base64, { base64: true });
+
+          setProgress(Math.round(((i + 1) / lines.length) * 100));
+          setStatusMsg(`${i + 1} of ${lines.length} — ${recipientName}`);
+          resolve();
+        };
+        img.src = templates[type];
+      });
+
+      await new Promise(r => setTimeout(r, 10));
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.download = `${type}_certificates.zip`;
+    a.href = url;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    setIsExporting(false);
+    setStatusMsg(`✓ ${lines.length} certificates exported.`);
+    setProgress(0);
+  };
+
+  // ── Reset ──
+  const resetTemplates = () => {
+    setTemplates({ appreciation: null, participation: null });
+    setTemplateNames({ appreciation: '', participation: '' });
+    setName('');
+    setBatch('');
+    setDirectorName('');
+    setMentorName('');
+    setBatchLines('');
+    setProgress(0);
+    setStatusMsg('');
+  };
+
+  // ──────────── UPLOAD SCREEN ────────────
+  if (!bothUploaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-container p-12">
+        <div className="bg-surface-container-low rounded-2xl shadow-xl p-12 max-w-2xl w-full space-y-8">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center text-white mx-auto">
+              <span className="material-symbols-outlined !text-[24px]">architecture</span>
+            </div>
+            <h1 className="font-headline text-2xl font-extrabold text-on-surface tracking-tight">Architect Certification Engine</h1>
+            <p className="text-sm text-on-surface-variant">Upload both certificate templates to begin</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider text-center">Appreciation Template</p>
+              <UploadZone
+                label="Certificate of Appreciation"
+                templateType="appreciation"
+                onUpload={handleTemplateUpload}
+                uploadedName={templateNames.appreciation}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider text-center">Participation Template</p>
+              <UploadZone
+                label="Certificate of Participation"
+                templateType="participation"
+                onUpload={handleTemplateUpload}
+                uploadedName={templateNames.participation}
+              />
+            </div>
+          </div>
+
+          {(templates.appreciation || templates.participation) && !bothUploaded && (
+            <p className="text-center text-xs text-on-surface-variant">
+              <span className="material-symbols-outlined !text-[14px] align-middle mr-1">info</span>
+              Upload both templates to unlock the editor
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ──────────── MAIN EDITOR ────────────
+  const currentFontLabel = FONT_OPTIONS.find(f => f.value === nameFont)?.label || 'Georgia';
+
+  return (
+    <>
+      {/* SideNavBar */}
+      <aside className="h-screen w-[280px] fixed left-0 top-0 border-r border-outline-variant bg-surface-container-low flex flex-col py-8 px-6 font-['Manrope'] antialiased tracking-tight z-50">
+        <div className="mb-10 flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white">
+            <span className="material-symbols-outlined !text-[18px]">architecture</span>
+          </div>
+          <div>
+            <h1 className="text-lg font-extrabold tracking-tight text-on-surface leading-none">Architect</h1>
+            <p className="text-[9px] uppercase tracking-widest text-primary font-bold mt-1">Certification Engine</p>
+          </div>
+        </div>
+        <nav className="flex-1 space-y-1">
+          <a className="flex items-center gap-3 text-primary bg-primary/5 rounded-lg px-4 py-2.5 font-bold transition-all group" href="#">
+            <span className="material-symbols-outlined">badge</span>
+            <span className="text-sm">Template</span>
+          </a>
+          <a className="flex items-center gap-3 text-on-surface-variant px-4 py-2.5 hover:bg-surface-variant rounded-lg transition-all group" href="#">
+            <span className="material-symbols-outlined text-secondary">person_edit</span>
+            <span className="text-sm">Recipient</span>
+          </a>
+          <a className="flex items-center gap-3 text-on-surface-variant px-4 py-2.5 hover:bg-surface-variant rounded-lg transition-all group" href="#">
+            <span className="material-symbols-outlined text-secondary">format_size</span>
+            <span className="text-sm">Typography</span>
+          </a>
+          <a className="flex items-center gap-3 text-on-surface-variant px-4 py-2.5 hover:bg-surface-variant rounded-lg transition-all group" href="#">
+            <span className="material-symbols-outlined text-secondary">layers</span>
+            <span className="text-sm">Batch</span>
+          </a>
+        </nav>
+        <div className="mt-auto pt-8 border-t border-outline-variant space-y-4">
+          <button
+            onClick={exportPNG}
+            className="w-full bg-primary text-on-primary py-3.5 rounded-lg font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-0.5 transition-all active:scale-[0.98]"
+          >
+            Export PNG
+          </button>
+          <div className="space-y-1">
+            <a className="flex items-center gap-3 text-on-surface-variant px-4 py-2 hover:bg-surface-variant rounded-lg transition-all" href="#">
+              <span className="material-symbols-outlined text-secondary">settings</span>
+              <span className="text-sm">Settings</span>
+            </a>
+            <a className="flex items-center gap-3 text-on-surface-variant px-4 py-2 hover:bg-surface-variant rounded-lg transition-all" href="#">
+              <span className="material-symbols-outlined text-secondary">help</span>
+              <span className="text-sm">Support</span>
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      {/* TopAppBar */}
+      <header className="fixed top-0 right-0 left-[280px] z-40 bg-surface/80 backdrop-blur-md border-b border-outline-variant flex justify-between items-center h-16 px-12 font-['Manrope'] font-medium text-sm">
+        <div className="flex items-center gap-8">
+          <span className="text-on-surface font-extrabold tracking-tight">Architectural Registry</span>
+          <div className="flex gap-8">
+            <a className="text-on-surface-variant hover:text-primary transition-all relative py-1" href="#">Drafts</a>
+            <a className="text-primary font-bold relative py-1 after:absolute after:bottom-0 after:left-0 after:w-full after:h-0.5 after:bg-primary" href="#">Templates</a>
+            <a className="text-on-surface-variant hover:text-primary transition-all relative py-1" href="#">Archive</a>
+          </div>
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 border-r border-outline-variant pr-6">
+            <button className="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">dark_mode</button>
+            <button className="material-symbols-outlined text-on-surface-variant hover:text-primary transition-colors">notifications</button>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-[11px] font-bold text-on-surface leading-none">Julianne Sterling</p>
+              <p className="text-[9px] text-on-surface-variant mt-0.5">Administrator</p>
+            </div>
+            <div className="w-9 h-9 rounded-full ring-2 ring-primary/20 ring-offset-2 overflow-hidden bg-surface-container-highest">
+              <img alt="User Profile" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDAQkHFIJLqJWqaa603KuiPDv7vi-cyY_z-s8eeur4j5OGnx1hQEm63ifse4Ju-581EqvKKBViztMkJTtufqSJfjV7DPOS3xHDRrgrXRApdc4iEx7DssDfEGYQHsdgKcsRMhouvzpB0zShXTDO-5tBBjkTn185wqi-zqjnEiXEfMlnzgrwf9BH56c_hch-2wn_2BhKjUxgoUYXeyI-oRbteOzAptwOEmHwPYI4DMIcAk4ilpMRP7xhIR3xrpo92dUVdxkm5BsiNcv64"/>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="ml-[280px] pt-16 min-h-screen flex bg-surface-container">
+        {/* Editor Controls Sidebar */}
+        <div className="w-80 h-[calc(100vh-64px)] overflow-y-auto bg-surface-container-low p-8 custom-scrollbar space-y-10 border-r border-outline-variant/30 shadow-inner">
+          {/* Certificate Type */}
+          <section>
+            <h3 className="font-headline font-extrabold text-[10px] uppercase tracking-[0.2em] text-primary mb-5 flex items-center gap-2">
+              <span className="w-4 h-1 rounded-full bg-primary/20"></span>
+              Certificate Type
+            </h3>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setType('appreciation')}
+                className={`p-3.5 text-[10px] leading-tight font-extrabold text-center rounded-lg transition-colors ${
+                  type === 'appreciation'
+                    ? 'bg-primary text-on-primary shadow-sm'
+                    : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-highest border border-outline-variant'
+                }`}
+              >
+                CERTIFICATE OF APPRECIATION
+              </button>
+              <button
+                onClick={() => setType('participation')}
+                className={`p-3.5 text-[10px] leading-tight font-bold text-center rounded-lg transition-colors ${
+                  type === 'participation'
+                    ? 'bg-primary text-on-primary shadow-sm'
+                    : 'bg-surface-variant text-on-surface-variant hover:bg-surface-container-highest border border-outline-variant'
+                }`}
+              >
+                CERTIFICATE OF PARTICIPATION
+              </button>
+            </div>
+          </section>
+
+          {/* Recipient Details */}
+          <section>
+            <h3 className="font-headline font-extrabold text-[10px] uppercase tracking-[0.2em] text-primary mb-5 flex items-center gap-2">
+              <span className="w-4 h-1 rounded-full bg-primary/20"></span>
+              Recipient Details
+            </h3>
+            <div className="space-y-4">
+              <div className="group">
+                <label className="block text-[10px] font-bold text-on-surface-variant mb-1.5 uppercase tracking-wider">Full Name</label>
+                <input
+                  className="w-full bg-surface-variant border-transparent rounded-lg px-4 py-2.5 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 text-sm transition-all placeholder:text-outline/40"
+                  placeholder="e.g. Julianne V. Sterling"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="group">
+                <label className="block text-[10px] font-bold text-on-surface-variant mb-1.5 uppercase tracking-wider">Batch/Branch</label>
+                <input
+                  className="w-full bg-surface-variant border-transparent rounded-lg px-4 py-2.5 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 text-sm transition-all placeholder:text-outline/40"
+                  placeholder="Architecture Class of 2024"
+                  type="text"
+                  value={batch}
+                  onChange={(e) => setBatch(e.target.value)}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Signatures */}
+          <section>
+            <h3 className="font-headline font-extrabold text-[10px] uppercase tracking-[0.2em] text-primary mb-5 flex items-center gap-2">
+              <span className="w-4 h-1 rounded-full bg-primary/20"></span>
+              Signatures
+            </h3>
+            <div className="space-y-4">
+              <div className="group">
+                <label className="block text-[10px] font-bold text-on-surface-variant mb-1.5 uppercase tracking-wider">Director Principal</label>
+                <input
+                  className="w-full bg-surface-variant border-transparent rounded-lg px-4 py-2.5 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 text-sm transition-all placeholder:text-outline/40"
+                  placeholder="e.g. Dr. Rajesh Kumar"
+                  type="text"
+                  value={directorName}
+                  onChange={(e) => setDirectorName(e.target.value)}
+                />
+              </div>
+              <div className="group">
+                <label className="block text-[10px] font-bold text-on-surface-variant mb-1.5 uppercase tracking-wider">Faculty Mentor</label>
+                <input
+                  className="w-full bg-surface-variant border-transparent rounded-lg px-4 py-2.5 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 text-sm transition-all placeholder:text-outline/40"
+                  placeholder="e.g. Prof. Anita Sharma"
+                  type="text"
+                  value={mentorName}
+                  onChange={(e) => setMentorName(e.target.value)}
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Name Style */}
+          <section>
+            <h3 className="font-headline font-extrabold text-[10px] uppercase tracking-[0.2em] text-primary mb-5 flex items-center gap-2">
+              <span className="w-4 h-1 rounded-full bg-primary/20"></span>
+              Name Style
+            </h3>
+            <div className="space-y-6">
+              {/* Font Size */}
+              <div>
+                <div className="flex justify-between mb-3">
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Font Size</label>
+                  <span className="text-[10px] font-bold text-primary px-2 py-0.5 bg-primary/10 rounded">{nameSize}px</span>
+                </div>
+                <input
+                  className="w-full h-1.5 bg-outline-variant rounded-lg appearance-none cursor-pointer accent-primary"
+                  type="range"
+                  min="20"
+                  max="120"
+                  value={nameSize}
+                  onChange={(e) => setNameSize(Number(e.target.value))}
+                />
+              </div>
+              {/* Name Y Position */}
+              <div>
+                <div className="flex justify-between mb-3">
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Name Y Position</label>
+                  <span className="text-[10px] font-bold text-primary px-2 py-0.5 bg-primary/10 rounded">{nameY}%</span>
+                </div>
+                <input
+                  className="w-full h-1.5 bg-outline-variant rounded-lg appearance-none cursor-pointer accent-primary"
+                  type="range"
+                  min="10"
+                  max="90"
+                  step="0.5"
+                  value={nameY}
+                  onChange={(e) => setNameY(Number(e.target.value))}
+                />
+              </div>
+              {/* Batch Y Position */}
+              <div>
+                <div className="flex justify-between mb-3">
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Batch Y Position</label>
+                  <span className="text-[10px] font-bold text-primary px-2 py-0.5 bg-primary/10 rounded">{batchY}%</span>
+                </div>
+                <input
+                  className="w-full h-1.5 bg-outline-variant rounded-lg appearance-none cursor-pointer accent-primary"
+                  type="range"
+                  min="10"
+                  max="90"
+                  step="0.5"
+                  value={batchY}
+                  onChange={(e) => setBatchY(Number(e.target.value))}
+                />
+              </div>
+              {/* Signature Y Position */}
+              <div>
+                <div className="flex justify-between mb-3">
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Signature Y Position</label>
+                  <span className="text-[10px] font-bold text-primary px-2 py-0.5 bg-primary/10 rounded">{sigY}%</span>
+                </div>
+                <input
+                  className="w-full h-1.5 bg-outline-variant rounded-lg appearance-none cursor-pointer accent-primary"
+                  type="range"
+                  min="50"
+                  max="98"
+                  step="0.5"
+                  value={sigY}
+                  onChange={(e) => setSigY(Number(e.target.value))}
+                />
+              </div>
+              {/* Signature Font Size */}
+              <div>
+                <div className="flex justify-between mb-3">
+                  <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Signature Size</label>
+                  <span className="text-[10px] font-bold text-primary px-2 py-0.5 bg-primary/10 rounded">{sigSize}px</span>
+                </div>
+                <input
+                  className="w-full h-1.5 bg-outline-variant rounded-lg appearance-none cursor-pointer accent-primary"
+                  type="range"
+                  min="12"
+                  max="60"
+                  value={sigSize}
+                  onChange={(e) => setSigSize(Number(e.target.value))}
+                />
+              </div>
+              {/* Font Family */}
+              <div>
+                <label className="block text-[10px] font-bold text-on-surface-variant mb-1.5 uppercase tracking-wider">Font Family</label>
+                <div className="relative">
+                  <select
+                    className="w-full bg-surface-variant border-transparent rounded-lg px-4 py-2.5 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 text-sm appearance-none cursor-pointer"
+                    value={nameFont}
+                    onChange={(e) => setNameFont(e.target.value)}
+                  >
+                    {FONT_OPTIONS.map(f => (
+                      <option key={f.value} value={f.value}>{f.label}</option>
+                    ))}
+                  </select>
+                  <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant !text-[18px]">expand_more</span>
+                </div>
+              </div>
+              {/* Color Palette */}
+              <div>
+                <label className="block text-[10px] font-bold text-on-surface-variant mb-4 uppercase tracking-wider">Signature Palette</label>
+                <div className="grid grid-cols-4 gap-3">
+                  {COLOR_PALETTE.map((c, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setNameColor(c.hex)}
+                      className={`aspect-square ${c.bg} rounded-lg transition-transform shadow-sm ${
+                        nameColor === c.hex
+                          ? 'ring-2 ring-primary ring-offset-2 scale-105'
+                          : 'hover:scale-110'
+                      }`}
+                    ></button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Batch Export */}
+          <section className="pt-6 border-t border-outline-variant">
+            <div
+              className="flex justify-between items-center mb-5 cursor-pointer group"
+              onClick={() => setBatchOpen(!batchOpen)}
+            >
+              <h3 className="font-headline font-extrabold text-[10px] uppercase tracking-[0.2em] text-on-surface-variant group-hover:text-primary transition-colors flex items-center gap-2">
+                <span className="w-4 h-1 rounded-full bg-on-surface-variant/20 group-hover:bg-primary/20"></span>
+                Batch Export
+              </h3>
+              <span className="material-symbols-outlined text-on-surface-variant !text-[18px]">
+                {batchOpen ? 'remove' : 'add'}
+              </span>
+            </div>
+            {batchOpen && (
+              <div className="space-y-4">
+                <textarea
+                  className="w-full h-24 bg-surface-variant border-transparent rounded-lg text-xs p-4 focus:bg-white focus:border-primary focus:ring-4 focus:ring-primary/10 resize-none placeholder:text-outline/40 transition-all"
+                  placeholder="One name+batch per line&#10;e.g. John Doe, CSE 2024&#10;Jane Smith, ECE 2024"
+                  value={batchLines}
+                  onChange={(e) => setBatchLines(e.target.value)}
+                ></textarea>
+                <button
+                  onClick={batchExport}
+                  disabled={isExporting}
+                  className={`w-full border-2 border-primary font-extrabold text-[10px] py-3 rounded-lg uppercase tracking-widest transition-all shadow-sm ${
+                    isExporting
+                      ? 'bg-primary text-white cursor-not-allowed opacity-70'
+                      : 'bg-white text-primary hover:bg-primary hover:text-white'
+                  }`}
+                >
+                  {isExporting ? 'Exporting...' : 'Export All as ZIP'}
+                </button>
+                {(isExporting || statusMsg) && (
+                  <div className="space-y-2 px-1">
+                    <div className="flex justify-between text-[9px] uppercase font-extrabold text-on-surface-variant">
+                      <span className="flex items-center gap-1.5">
+                        {isExporting && <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></span>}
+                        {isExporting ? statusMsg || 'Processing...' : statusMsg}
+                      </span>
+                      {isExporting && <span className="text-primary">{progress}%</span>}
+                    </div>
+                    {isExporting && (
+                      <div className="w-full h-1.5 bg-outline-variant rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full shadow-[0_0_8px_rgba(79,70,229,0.4)] transition-all duration-200"
+                          style={{ width: `${progress}%` }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Reset */}
+          <button
+            onClick={resetTemplates}
+            className="w-full text-on-surface-variant/50 hover:text-error transition-colors text-[10px] font-bold uppercase tracking-widest py-4 mt-4"
+          >
+            Reset Template
+          </button>
+        </div>
+
+        {/* Right Area: Preview Canvas */}
+        <div className="flex-1 p-12 overflow-auto flex flex-col items-center justify-center relative">
+          {/* Canvas Labels */}
+          <div className="absolute top-8 left-12 flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+            <span className="text-[10px] font-extrabold uppercase tracking-[0.3em] text-on-surface-variant/60">Live Preview</span>
+          </div>
+          <div className="absolute top-8 right-12">
+            <div className="bg-primary/10 px-4 py-1.5 rounded-full text-[10px] font-extrabold text-primary uppercase tracking-widest border border-primary/20 backdrop-blur-sm">
+              Active: {type === 'appreciation' ? 'Appreciation' : 'Participation'}
+            </div>
+          </div>
+
+          {/* The Certificate Canvas */}
+          <div className="w-full max-w-4xl bg-white shadow-[0_24px_60px_-12px_rgba(15,23,42,0.12)] rounded-sm relative overflow-hidden flex items-center justify-center ring-1 ring-outline-variant/20">
+            <canvas
+              ref={canvasRef}
+              className="w-full h-auto"
+            />
+          </div>
+
+          {/* FABs */}
+          <div className="fixed bottom-10 right-10 flex flex-col gap-4">
+            <button
+              onClick={resetTemplates}
+              className="w-14 h-14 rounded-2xl bg-white shadow-xl flex items-center justify-center text-primary border border-outline-variant hover:scale-110 hover:shadow-2xl transition-all duration-300"
+            >
+              <span className="material-symbols-outlined !text-[24px]">palette</span>
+            </button>
+            <button
+              onClick={exportPNG}
+              className="w-14 h-14 rounded-2xl bg-primary text-on-primary shadow-xl shadow-primary/30 flex items-center justify-center hover:scale-110 hover:shadow-2xl transition-all duration-300"
+            >
+              <span className="material-symbols-outlined !text-[24px]">download</span>
+            </button>
+          </div>
+        </div>
+      </main>
+    </>
+  );
+}
+
+// Mount
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body></html>
